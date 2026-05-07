@@ -260,6 +260,8 @@ textarea {
   box-sizing: border-box;
   resize: vertical;
   min-height: 150px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 12px;
   border-radius: 6px;
   border: 1px solid var(--accent);
@@ -841,8 +843,6 @@ items.forEach(({item, idx}) => {
              }
              setTimeout(() => render(), 0);
              "
-                     onpointerdown="event.stopPropagation()"  
-                     ontouchstart="event.stopPropagation()"
                      autofocus>${escapeHtml(item.content)}</textarea>` :
           // 수정됨: 내용 클릭 시에도 idx 대신 item.ts 기반으로 수정 모드 전환
           `<div class="content-preview" onclick="
