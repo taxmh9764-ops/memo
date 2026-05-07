@@ -424,8 +424,15 @@ function getAllTags(){
 }
 
 function getTagSuggestions(input){
-  const words = input.split(" ");
-  const currentText = words[words.length - 1].trim().toLowerCase();
+  const words = input.value.split(" ");
+  const pos = input.selectionStart;
+  let currentWordIdx = 0;
+  let count = 0;
+  for(let i=0; i<words.length; i++){
+    count += words[i].length + 1;
+    if(count >= pos) { currentWordIdx = i; break; }
+  }
+  const currentText = words[currentWordIdx].trim().toLowerCase();
   if(!currentText) return [];
   return getAllTags().filter(tag => tag.toLowerCase().startsWith(currentText));
 }
@@ -786,15 +793,22 @@ function render(){
 function refreshTagSuggestions(inputEl, ts) {
   const box = document.getElementById(`tag-suggest-${ts}`);
   if (!box) return;
-  const suggestions = getTagSuggestions(inputEl.value).slice(0, 5);
+  const suggestions = getTagSuggestions(inputEl).slice(0, 5);
   if(suggestions.length === 0) { box.style.display = 'none'; return; }
   box.style.display = 'block';
   box.innerHTML = suggestions.map(tag => `
       <div class="tag-suggest-item"
         onmousedown="
           const input = document.getElementById('tag-input-${ts}');
+          const pos = input.selectionStart;
           let words = input.value.split(' ');
-          words[words.length - 1] = '${tag}';
+          let count = 0;
+          let targetIdx = 0;
+          for(let i=0; i<words.length; i++){
+            count += words[i].length + 1;
+            if(count >= pos) { targetIdx = i; break; }
+          }
+          words[targetIdx] = '${tag}';
           const finalValue = words.join(' ') + ' '; 
           input.value = finalValue;
           updateItem('${ts}', 'tags', finalValue);
