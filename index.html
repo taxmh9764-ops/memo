@@ -690,10 +690,11 @@ function render(){
   if(canSort) list.classList.add("can-sort"); else list.classList.remove("can-sort");
 
   let items = db.categories[current].items.map((item, idx) => ({item, idx}));
-  if(sort === "title_asc") items.sort((a,b) => a.item.title.localeCompare(b.item.title));
-  else if(sort === "title_desc") items.sort((a,b) => b.item.title.localeCompare(a.item.title));
-  else if(sort === "updated_desc") items.sort((a,b) => b.item.updatedTs - a.item.updatedTs);
-  else if(sort === "updated_asc") items.sort((a,b) => a.item.updatedTs - b.item.updatedTs);
+  
+  if(sort === "title_asc") items.sort((a,b) => (a.item.title || "").localeCompare(b.item.title || ""));
+  else if(sort === "title_desc") items.sort((a,b) => (b.item.title || "").localeCompare(a.item.title || ""));
+  else if(sort === "updated_desc") items.sort((a,b) => (Number(b.item.updatedTs) || 0) - (Number(a.item.updatedTs) || 0));
+  else if(sort === "updated_asc") items.sort((a,b) => (Number(a.item.updatedTs) || 0) - (Number(b.item.updatedTs) || 0));
   else if(sort === "default") items.sort((a,b) => (b.item.pinned ? 1 : 0) - (a.item.pinned ? 1 : 0));
 
   items.forEach(({item, idx}) => {
@@ -722,7 +723,7 @@ function render(){
           <button class="pin ${item.pinned ? 'active' : ''}" onclick="togglePin('${item.ts}', event)">★</button>
         </div>
       </div>
-      <div class="detail ${state.isOpen ? 'open' : ''}">
+      <div class="detail ${state.isOpen ? 'open' : ''}" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">
         <input placeholder="제목" value="${escapeHtml(item.title || "")}" 
                onfocus="if(!openStates['${item.ts}']) openStates['${item.ts}']={}; openStates['${item.ts}'].isEditing=true;"
                onblur="handleMemoBlur('${item.ts}')"
@@ -738,7 +739,7 @@ function render(){
         ${state.isEditing ? 
           `<textarea oninput="updateItem('${item.ts}', 'content', this.value)"
                      onblur="handleMemoBlur('${item.ts}')"
-                     onpointerdown="event.stopPropagation()" ontouchstart="event.stopPropagation()"
+                     onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()"
                      autofocus>${escapeHtml(item.content)}</textarea>` :
           `<div class="content-preview" onclick="if(!openStates['${item.ts}']) { openStates['${item.ts}'] = { isOpen:true, isEditing:true }; } openStates['${item.ts}'].isEditing=true; render();">
             ${DOMPurify.sanitize(marked.parse(item.content || "클릭하여 내용 입력"))}
@@ -768,7 +769,7 @@ function render(){
   if(canSort) {
     sortableInstance = Sortable.create(list, {
       handle: ".handle", animation: 150, delay: 50, delayOnTouchOnly: true,
-      filter: "textarea, input", 
+      filter: "textarea, input, .detail", 
       preventOnFilter: false, 
       onEnd: (evt) => {
         let arr = db.categories[current].items;
@@ -847,7 +848,10 @@ function importData(e){
         if(!Array.isArray(cat.items)) cat.items = [];
         cat.items.forEach(item => {
           if(!item.ts) item.ts = crypto.randomUUID();
-          if(!item.updatedTs) item.updatedTs = new Date(item.updated).getTime() || Date.now();
+          if(!item.updatedTs) {
+             const dt = new Date(item.updated).getTime();
+             item.updatedTs = isNaN(dt) ? Date.now() : dt;
+          }
         });
       });
       save(); render();
