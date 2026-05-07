@@ -863,11 +863,15 @@ function importData(e){
       db.categories.forEach(cat => {
         if(!Array.isArray(cat.items)) cat.items = [];
         cat.items.forEach(item => {
-          if(!item.ts) item.ts = crypto.randomUUID();
+          // 수정 사항: 첨부 파일에 있는 기존 데이터의 'id'를 'ts'로 통합 변환
+          if (!item.ts) {
+            item.ts = item.id || crypto.randomUUID();
+          }
           if(!item.updatedTs) {
              const dt = new Date(item.updated).getTime();
              item.updatedTs = isNaN(dt) ? Date.now() : dt;
           }
+          if(!item.updated) item.updated = new Date(item.updatedTs).toLocaleString();
         });
       });
       save(); render();
