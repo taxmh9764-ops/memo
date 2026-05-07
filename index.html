@@ -370,7 +370,11 @@ function addBlock(){
     title:"", tags:"", content:"", pinned:false,
     updated: new Date().toLocaleString(), ts: Date.now()
   });
-  save(); render();
+
+  const newIndex = db.categories[current].items.length - 1;
+
+  save();
+  openAndScrollToMemo(newIndex);
 }
 
 async function quickAddBlock(){
@@ -385,8 +389,13 @@ async function quickAddBlock(){
     title: title, tags: "", content: clipboardContent || "", pinned: false,
     updated: new Date().toLocaleString(), ts: Date.now()
   });
+    const newIndex = db.categories[current].items.length - 1;
+
   input.value = "";
-  save(); render();
+
+  save();
+  openAndScrollToMemo(newIndex);
+
   input.focus();
 }
 
@@ -496,6 +505,31 @@ function togglePin(idx, e){
   item.pinned = !item.pinned;
   save(); render();
 }
+
+function openAndScrollToMemo(idx){
+  openStates[idx] = {
+    isOpen: true,
+    isEditing: true
+  };
+
+  render();
+
+  requestAnimationFrame(() => {
+    const card = document.querySelector(`.card[data-id="${idx}"]`);
+    if(card){
+      card.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+
+      const textarea = card.querySelector("textarea");
+      if(textarea){
+        textarea.focus();
+      }
+    }
+  });
+}
+
 
 function render(){
   const list = document.getElementById("list");
