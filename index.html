@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>업무 메모 Pro</title>
+
+<!-- PWA 설정: 매니페스트 및 테마 색상 -->
+<link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogInVwc2FuZyBNZW1vIFBybyIsCiAgInNob3J0X25hbWUiOiAi7JeF66y066mU66qoIiwKICAic3RhcnRfdXJsIjogIi4iLAogICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiNmOGY5ZmEiLAogICJ0aGVtZV9jb2xvciI6ICIjMDk4NGUzIiwKICAiaWNvbnMiOiBbCiAgICB7CiAgICAgICJzcmMiOiAiaHR0cHM6Ly9jZG4taWNvbnMtcG5nLmZsYXRpY29uLmNvbS81MTIvODg5Lzg4OTY0OC5wbmciLAogICAgICAic2l6ZXMiOiAiNTEyeDUxMiIsCiAgICAgICJ0eXBlIjogImltYWdlL3BuZyIsCiAgICAgICJwdXJwb3NlIjogImFueSBtYXNrYWJsZSIKICAgIH0KICBdCn0=">
+<meta name="theme-color" content="#0984e3">
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+<style>
+:root {
+  --bg-body: #f8f9fa;
+  --bg-sidebar: #ffffff;
+  --bg-card: #ffffff;
+  --text-main: #2d3436;
+  --text-sub: #b2bec3;
+  --border: #dfe6e9;
+  --accent: #0984e3;
+  --accent-light: #e1f5fe;
+}
+
+[data-theme="dark"] {
+  --bg-body: #1e272e;
+  --bg-sidebar: #2f3640;
+  --bg-card: #353b48;
+  --text-main: #f5f6fa;
+  --text-sub: #9ea6ad;
+  --border: #485460;
+  --accent: #45aaf2;
+  --accent-light: #2d3d4d;
+}
+
+body {
+  margin:0;
+  font-family: 'Pretendard', -apple-system, sans-serif;
+  display:flex;
+  background: var(--bg-body);
+  color: var(--text-main);
+  overflow: hidden;
+}
+
+.sidebar {
+  width:240px;
+  min-height: 100vh;
+  padding:20px;
+  border-right:1px solid var(--border);
+  background: var(--bg-sidebar);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar .btn-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 25px; }
+
+.btn-side {
+  display: block;
+  width: 100%;
+  box-sizing: border-box; 
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-main);
+  text-align: center;
+}
+.btn-side:hover { background: var(--accent-light); }
+
+#cats { flex: 1; overflow-y: auto; margin-bottom: 10px; }
+
+.trash-container { 
+  border-top: 2px solid var(--border); 
+  padding-top: 15px; 
+  margin-top: auto;
+}
+
+.category {
+  padding:10px;
+  border-radius:8px;
+  cursor:pointer;
+  margin-bottom:4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+.category.active { background: var(--accent-light); font-weight:700; color: var(--accent); }
+.cat-count { font-size: 12px; margin-left: 5px; opacity: 0.7; }
+.cat-actions { display: flex; gap: 4px; opacity: 0; transition: opacity 0.2s; }
+.category:hover .cat-actions { opacity: 1; }
+.cat-btn { background: none; border: none; cursor: pointer; padding: 2px; font-size: 12px; }
+
+#sidebarToggle { display: none; font-size: 16px; padding: 6px 12px; }
+
+.header {
+  display:flex;
+  flex-direction: column;
+  gap:12px;
+  padding:15px 20px;
+  border-bottom:1px solid var(--border);
+  background: var(--bg-sidebar);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-top { 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  width: 100%;
+  gap: 10px;
+}
+
+#header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.search-input-group {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 10px;
+}
+
+#search { flex: 1; }
+.quick-add-container { flex: 1.5; display: flex; }
+#quickAddInput { width: 100%; }
+
+.header input, .header select {
+  padding:8px 12px;
+  border-radius:6px;
+  border:1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-size: 14px;
+  outline: none;
+}
+.header input:focus { border-color: var(--accent); }
+
+@media (max-width: 768px) {
+  #sidebarToggle { display: inline-block; }
+  .sidebar { 
+    position: fixed; left: -240px; top: 0; bottom: 0; 
+    z-index: 1000; transition: left 0.3s ease; 
+    box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+  }
+  .sidebar.open { left: 0; }
+  .sidebar-overlay { 
+    display: none; position: fixed; inset: 0; 
+    background: rgba(0,0,0,0.4); z-index: 999; 
+  }
+  .sidebar.open + .sidebar-overlay { display: block; }
+
+  .header { padding: 12px 10px; gap: 10px; }
+  #header-actions { overflow-x: auto; white-space: nowrap; padding-bottom: 2px; }
+  #header-actions::-webkit-scrollbar { display: none; }
+  
+  .search-input-group { 
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  
+  .header input, .header select { font-size: 14px; padding: 10px 8px; }
+  .btn-ui { padding: 8px 12px; font-size: 14px; }
+  #sortMode { font-size: 13px; padding: 6px; }
+}
+
+.main { flex:1; min-width: 0; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; }
+
+.active-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.tag-chip {
+  background: var(--accent);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.card {
+  background: var(--bg-card);
+  margin: 10px 20px;
+  padding: 12px 18px;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  position: relative;
+  transition: transform 0.2s;
+}
+.pinned { border-left: 5px solid gold; background: #fffdf5; }
+[data-theme="dark"] .pinned { background: #3d3a2d; }
+
+.card.selectable { cursor: pointer; }
+.card.selected { border: 2px solid var(--accent); background: var(--accent-light); }
+
+.card-header { display: flex; flex-direction: column; gap: 4px; cursor: pointer; }
+.card-header-top { display: flex; align-items: center; width: 100%; }
+.card-header-title { display: flex; align-items: center; flex: 1; min-width: 0; }
+.handle { cursor: grab; color: #ccc; margin-right: 8px; font-size: 16px; display: none; flex-shrink: 0; }
+.can-sort .handle { display: inline-block; }
+.title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 700; font-size: 15px; flex: 1; }
+
+.tags-container { 
+  display: flex; gap: 4px; overflow-x: auto; white-space: nowrap; width: 100%;
+}
+.tags-container::-webkit-scrollbar { display: none; }
+
+.tag {
+  display:inline-block; background: var(--accent-light); padding:3px 9px; border-radius:5px;
+  font-size: 13.5px; cursor:pointer; color: var(--accent); flex-shrink: 0;
+}
+
+.card-header-bottom { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 2px; }
+.date { font-size: 11px; color: var(--text-sub); }
+.pin { border:none; background:none; font-size:18px; cursor:pointer; color: #ddd; padding: 0; }
+.pin.active { color: gold; }
+
+.detail { display:none; margin-top:12px; border-top: 1px solid var(--border); padding-top: 12px; }
+.detail.open { display:block; }
+.detail input { width:100%; box-sizing:border-box; margin-bottom:10px; padding:8px; border-radius:6px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main); }
+
+.content-preview {
+  margin-top: 8px;
+  padding: 12px;
+  background: var(--bg-body);
+  border-radius: 6px;
+  min-height: 80px;
+  word-break: break-all;
+}
+
+textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 150px;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-family: inherit;
+}
+
+.action-buttons { display: flex; gap: 8px; margin-top: 12px; align-items: center; flex-wrap: wrap; }
+.btn-ui { padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer; font-size: 14px; background: #f1f1f1; white-space: nowrap; transition: 0.2s; }
+.btn-ui.primary { background: var(--accent); color: white; }
+.btn-ui.danger { background: #ffe5e5; color: #d33; }
+.btn-ui.active { background: #2d3436; color: white; }
+.btn-ui:hover { opacity: 0.8; }
+
+</style>
+</head>
+
+<body data-theme="light">
+
+<div class="sidebar" id="sidebar">
+  <div class="btn-group">
+    <button class="btn-side" onclick="addCategory()">＋ 카테고리 추가</button>
+    <button class="btn-side" onclick="exportData()">💾 전체 데이터 백업</button>
+    <label class="btn-side">
+      📁 데이터 불러오기
+      <input type="file" style="display:none" onchange="importData(event)">
+    </label>
+  </div>
+  <div id="cats"></div>
+  <div id="trash-container" class="trash-container"></div>
+</div>
+<div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+<div class="main">
+  <div class="header" id="header">
+    <div class="header-top">
+      <div id="header-actions">
+        <button id="sidebarToggle" class="btn-ui" onclick="toggleSidebar()">☰</button>
+      </div>
+      <div style="display:flex; gap:6px;">
+        <button class="btn-ui" onclick="toggleDarkMode()">🌓</button>
+      </div>
+    </div>
+    
+    <div class="search-input-group">
+      <input id="search" placeholder="검색..." oninput="render()">
+      <div class="quick-add-container">
+        <input id="quickAddInput" placeholder="제목 + 엔터" 
+               onkeydown="if(event.key==='Enter') { event.preventDefault(); event.stopPropagation(); quickAddBlock(); }">
+      </div>
+    </div>
+
+    <div id="activeTags" class="active-tags"></div>
+  </div>
+  <div id="list"></div>
+</div>
+
+<script>
+// PWA 서비스 워커 등록 로직 수정 (blob 프로토콜 에러 방지)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    // blob 대신 실제 파일 경로를 사용하거나, 에러 시나리오를 방지하기 위해 try-catch 처리
+    // 현재 단일 파일 환경에서는 완전한 SW 등록이 어려울 수 있으나 에러를 차단합니다.
+    try {
+      const swCode = `
+        const CACHE_NAME = 'work-memo-pro-v1';
+        self.addEventListener('install', e => { self.skipWaiting(); });
+        self.addEventListener('activate', e => { e.waitUntil(clients.claim()); });
+        self.addEventListener('fetch', e => { e.respondWith(fetch(e.request).catch(() => caches.match(e.request))); });
+      `;
+      const blob = new Blob([swCode], { type: 'application/javascript' });
+      const url = URL.createObjectURL(blob);
+      navigator.serviceWorker.register(url).catch(err => {
+        // 일부 브라우저의 blob 차단 정책에 대한 예외 처리
+        console.warn('Service Worker registration skipped (expected in some sandbox environments).');
+      });
+    } catch (e) {
+      console.warn('Service Worker initialization failed.');
+    }
+  });
+}
+
+let db = JSON.parse(localStorage.getItem("memoDB") || '{"categories":[{"name":"기본","items":[]},{"name":"휴지통","items":[]}]}');
+let current = 0;
+let activeFilters = [];
+let openStates = {}; 
+let sortableInstance = null;
+let isBulkMode = false; 
+let selectedItems = new Set(); 
+
+function save(){ localStorage.setItem("memoDB", JSON.stringify(db)); }
+
+function toggleDarkMode() {
+  const body = document.body;
+  body.setAttribute("data-theme", body.getAttribute("data-theme") === "light" ? "dark" : "light");
+}
+
+function toggleSidebar() {
+  document.getElementById("sidebar").classList.toggle("open");
+}
+
+function addCategory(){
+  let n = prompt("새 카테고리 이름");
+  if(n) { db.categories.push({name:n.trim(), items:[]}); save(); render(); }
+}
+
+function editCategory(i){
+  if(db.categories[i].name === "휴지통") return;
+  let n = prompt("이름 수정", db.categories[i].name);
+  if(n) { db.categories[i].name = n.trim(); save(); render(); }
+}
+
+function deleteCategory(i){
+  if(i === 0 || db.categories[i].name === "휴지통") return alert("삭제 불가능한 카테고리입니다.");
+  if(confirm("카테고리와 내부 메모를 모두 삭제할까요?")) { db.categories.splice(i, 1); current = 0; save(); render(); }
+}
+
+function addBlock(){
+  db.categories[current].items.push({
+    title:"", tags:"", content:"", pinned:false,
+    updated: new Date().toLocaleString(), ts: Date.now()
+  });
+  save(); render();
+}
+
+async function quickAddBlock(){
+  const input = document.getElementById("quickAddInput");
+  const title = input.value.trim();
+  if(!title) return;
+
+  let clipboardContent = "";
+  try {
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      clipboardContent = await navigator.clipboard.readText();
+    }
+  } catch (err) {}
+
+  db.categories[current].items.push({
+    title: title, tags: "", content: clipboardContent || "", pinned: false,
+    updated: new Date().toLocaleString(), ts: Date.now()
+  });
+  input.value = "";
+  save(); render();
+  input.focus();
+}
+
+function updateItem(i, f, v){
+  let item = db.categories[current].items[i];
+  item[f] = v;
+  item.ts = Date.now();
+  item.updated = new Date().toLocaleString();
+  save();
+  
+  const card = document.querySelector(`.card[data-id="${i}"]`);
+  if(card) {
+    if(f === 'title') card.querySelector('.title').innerText = v || "새 메모";
+    else if(f === 'tags') {
+      card.querySelector('.tags-container').innerHTML = v.split(" ").filter(t=>t).map(t => `<span class="tag" onclick="event.stopPropagation(); addTagFilter('${t}')">${t}</span>`).join("");
+    }
+  }
+}
+
+function deleteBlock(i, e){
+  if(e) e.stopPropagation();
+  const isTrash = db.categories[current].name === "휴지통";
+  if(!confirm(isTrash ? "영구 삭제할까요?" : "휴지통으로 보낼까요?")) return;
+  
+  if(isTrash) {
+    db.categories[current].items.splice(i, 1);
+  } else {
+    let item = db.categories[current].items.splice(i, 1)[0];
+    let trashCat = db.categories.find(c => c.name === "휴지통");
+    if(!trashCat) { trashCat = {name:"휴지통", items:[]}; db.categories.push(trashCat); }
+    trashCat.items.unshift(item);
+  }
+  delete openStates[i]; save(); render();
+}
+
+function emptyTrash() {
+  if(confirm("휴지통을 완전히 비우시겠습니까?")) {
+    db.categories[current].items = [];
+    save(); render();
+  }
+}
+
+function moveBlock(i, targetIdx){
+  if(targetIdx === "") return;
+  let item = db.categories[current].items.splice(i, 1)[0];
+  db.categories[targetIdx].items.unshift(item);
+  save(); render();
+}
+
+function addTagFilter(tag){
+  if(!activeFilters.includes(tag)) { activeFilters.push(tag); render(); }
+}
+function removeTagFilter(tag){
+  activeFilters = activeFilters.filter(t => t !== tag);
+  render();
+}
+
+function toggleBulkMode() {
+  isBulkMode = !isBulkMode;
+  selectedItems.clear();
+  render();
+}
+
+function selectItem(idx) {
+  if(selectedItems.has(idx)) selectedItems.delete(idx);
+  else selectedItems.add(idx);
+  render();
+}
+
+function executeBulkDelete() {
+  if(selectedItems.size === 0) return;
+  const isTrash = db.categories[current].name === "휴지통";
+  if(!confirm(`${selectedItems.size}개를 ${isTrash ? '영구 삭제' : '이동'}할까요?`)) return;
+  let targets = Array.from(selectedItems).sort((a,b) => b - a);
+  let trashCat = db.categories.find(c => c.name === "휴지통");
+  if(!trashCat) { trashCat = {name:"휴지통", items:[]}; db.categories.push(trashCat); }
+  
+  targets.forEach(idx => {
+    let item = db.categories[current].items.splice(idx, 1)[0];
+    if(!isTrash) trashCat.items.unshift(item);
+  });
+  save(); isBulkMode = false; selectedItems.clear(); render();
+}
+
+function toggleBlock(i){
+  if(isBulkMode) { selectItem(i); return; }
+  if(!openStates[i]) openStates[i] = { isOpen: false, isEditing: false };
+  openStates[i].isOpen = !openStates[i].isOpen;
+  if(!openStates[i].isOpen) openStates[i].isEditing = false;
+  render();
+}
+
+function togglePin(idx, e){
+  e.stopPropagation();
+  let item = db.categories[current].items[idx];
+  item.pinned = !item.pinned;
+  save(); render();
+}
+
+function render(){
+  const list = document.getElementById("list");
+  const keyword = document.getElementById("search").value.toLowerCase();
+  const sortModeEl = document.getElementById("sortMode");
+  const sort = sortModeEl ? sortModeEl.value : "default";
+  const isFiltered = keyword !== "" || activeFilters.length > 0;
+
+  const cats = document.getElementById("cats");
+  const trashCont = document.getElementById("trash-container");
+  cats.innerHTML = ""; trashCont.innerHTML = "";
+  
+  db.categories.forEach((c, i) => {
+    const d = document.createElement("div");
+    d.className = `category ${i === current ? 'active' : ''}`;
+    d.onclick = () => { current = i; isBulkMode = false; selectedItems.clear(); render(); };
+    d.innerHTML = `<span>${c.name} <span class="cat-count">(${c.items.length})</span></span>
+      <div class="cat-actions">
+        ${c.name !== "휴지통" ? `<button class="cat-btn" onclick="event.stopPropagation(); editCategory(${i})">✏️</button>` : ''}
+        ${i !== 0 && c.name !== "휴지통" ? `<button class="cat-btn" onclick="event.stopPropagation(); deleteCategory(${i})">❌</button>` : ''}
+      </div>`;
+    if(c.name === "휴지통") trashCont.appendChild(d); else cats.appendChild(d);
+  });
+
+  const headerActions = document.getElementById("header-actions");
+  const isTrash = db.categories[current].name === "휴지통";
+  
+  headerActions.innerHTML = `<button id="sidebarToggle" class="btn-ui" onclick="toggleSidebar()">☰</button>`;
+  if(isTrash) {
+    headerActions.innerHTML += `<button class="btn-ui danger" onclick="emptyTrash()">비우기</button>`;
+  } else {
+    headerActions.innerHTML += `<button class="btn-ui primary" onclick="addBlock()">새 메모</button>`;
+  }
+  headerActions.innerHTML += `<button class="btn-ui ${isBulkMode?'active':''}" onclick="toggleBulkMode()">${isBulkMode?'취소':'일괄'}</button>`;
+  if(isBulkMode) headerActions.innerHTML += `<button class="btn-ui danger" onclick="executeBulkDelete()">제거(${selectedItems.size})</button>`;
+
+  headerActions.innerHTML += `
+    <select id="sortMode" onchange="render()" style="margin-left: 4px;">
+      <option value="default" ${sort==='default'?'selected':''}>정렬</option>
+      <option value="title_asc" ${sort==='title_asc'?'selected':''}>제목↑</option>
+      <option value="title_desc" ${sort==='title_desc'?'selected':''}>제목↓</option>
+      <option value="updated_desc" ${sort==='updated_desc'?'selected':''}>최근순</option>
+      <option value="updated_asc" ${sort==='updated_asc'?'selected':''}>과거순</option>
+    </select>
+  `;
+
+  document.getElementById("activeTags").innerHTML = activeFilters.map(t => `<div class="tag-chip" onclick="removeTagFilter('${t}')">${t} ✕</div>`).join("");
+
+  list.innerHTML = "";
+  const canSort = !isFiltered && !isBulkMode && sort === "default";
+  if(canSort) list.classList.add("can-sort"); else list.classList.remove("can-sort");
+
+  let items = db.categories[current].items.map((item, idx) => ({item, idx}));
+  if(sort === "title_asc") items.sort((a,b) => a.item.title.localeCompare(b.item.title));
+  else if(sort === "title_desc") items.sort((a,b) => b.item.title.localeCompare(a.item.title));
+  else if(sort === "updated_desc") items.sort((a,b) => b.item.ts - a.item.ts);
+  else if(sort === "updated_asc") items.sort((a,b) => a.item.ts - b.item.ts);
+  else if(sort === "default") items.sort((a,b) => (b.item.pinned ? 1 : 0) - (a.item.pinned ? 1 : 0));
+
+  items.forEach(({item, idx}) => {
+    const matchesSearch = item.title.toLowerCase().includes(keyword) || item.tags.toLowerCase().includes(keyword) || item.content.toLowerCase().includes(keyword);
+    const matchesTags = activeFilters.length === 0 || activeFilters.every(f => item.tags.includes(f));
+    if(!matchesSearch || !matchesTags) return;
+
+    const card = document.createElement("div");
+    card.className = `card ${item.pinned ? 'pinned' : ''} ${isBulkMode ? 'selectable' : ''} ${selectedItems.has(idx) ? 'selected' : ''}`;
+    card.setAttribute("data-id", idx); 
+    let state = openStates[idx] || { isOpen: false, isEditing: false };
+
+    card.innerHTML = `
+      <div class="card-header" onclick="toggleBlock(${idx})">
+        <div class="card-header-top">
+          <div class="card-header-title">
+            <span class="handle" onclick="event.stopPropagation()">⠿</span>
+            <span class="title">${item.title || "새 메모"}</span>
+          </div>
+        </div>
+        <div class="tags-container">
+          ${item.tags.split(" ").filter(t=>t).map(t => `<span class="tag" onclick="event.stopPropagation(); addTagFilter('${t}')">${t}</span>`).join("")}
+        </div>
+        <div class="card-header-bottom">
+          <span class="date">${item.updated}</span>
+          <button class="pin ${item.pinned ? 'active' : ''}" onclick="togglePin(${idx}, event)">★</button>
+        </div>
+      </div>
+      <div class="detail ${state.isOpen ? 'open' : ''}">
+        <input placeholder="제목" value="${item.title}" oninput="updateItem(${idx}, 'title', this.value)">
+        <input placeholder="태그 (공백 구분)" value="${item.tags}" oninput="updateItem(${idx}, 'tags', this.value)">
+        ${state.isEditing ? 
+          `<textarea oninput="updateItem(${idx}, 'content', this.value)" autofocus>${item.content}</textarea>` :
+          `<div class="content-preview" onclick="openStates[${idx}].isEditing=true; render();">${marked.parse(item.content || "클릭하여 내용 입력")}</div>`
+        }
+        <div class="action-buttons">
+          <select onchange="moveBlock(${idx}, this.value)" style="padding:6px; border-radius:6px; font-size:12px; border:1px solid var(--border);">
+            <option value="">이동...</option>
+            ${db.categories.map((c,i)=>`<option value="${i}">${c.name}</option>`).join("")}
+          </select>
+          <button class="btn-ui" onclick="copyText(${idx}, this)">복사</button>
+          <button class="btn-ui danger" onclick="deleteBlock(${idx}, event)">삭제</button>
+          <button class="btn-ui primary" onclick="toggleBlock(${idx})" style="margin-left:auto;">닫기</button>
+        </div>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+
+  if (sortableInstance) { try { sortableInstance.destroy(); } catch (e) {} }
+  if(canSort) {
+    sortableInstance = Sortable.create(list, {
+      handle: ".handle", animation: 150,
+      onEnd: (evt) => {
+        let arr = db.categories[current].items;
+        let moved = arr.splice(evt.oldIndex, 1)[0];
+        arr.splice(evt.newIndex, 0, moved);
+        save();
+      }
+    });
+  }
+}
+
+function copyText(i, btn){
+  const text = db.categories[current].items[i].content;
+  const dummy = document.createElement("textarea");
+  document.body.appendChild(dummy);
+  dummy.value = text; dummy.select();
+  document.execCommand("copy");
+  document.body.removeChild(dummy);
+  let t = btn.innerText; btn.innerText = "완료!";
+  setTimeout(() => btn.innerText = t, 1000);
+}
+
+function exportData(){
+  const blob = new Blob([JSON.stringify(db)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `backup_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+
+function importData(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => { try { db = JSON.parse(reader.result); save(); render(); } catch(e){ alert("잘못된 파일입니다."); } };
+  reader.readAsText(file);
+}
+
+window.onload = render;
+</script>
+</body>
+</html>
