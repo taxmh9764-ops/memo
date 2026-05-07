@@ -11,6 +11,13 @@
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+marked.setOptions({
+  breaks: true,
+  gfm: true
+});
+</script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
 
 <style>
 :root {
@@ -270,6 +277,25 @@ textarea {
 .btn-ui.active { background: #2d3436; color: white; }
 .btn-ui:hover { opacity: 0.8; }
 
+.tag-suggest-box{
+  margin-top:6px;
+  border:1px solid var(--border);
+  border-radius:8px;
+  background:var(--bg-card);
+  max-height:120px;
+  overflow-y:auto;
+}
+
+.tag-suggest-item{
+  padding:8px 10px;
+  cursor:pointer;
+  font-size:13px;
+}
+
+.tag-suggest-item:hover{
+  background:var(--accent-light);
+}
+
 </style>
 </head>
 
@@ -340,9 +366,28 @@ let selectedItems = new Set();
 
 function save(){ localStorage.setItem("memoDB", JSON.stringify(db)); }
 
+function escapeHtml(str = "") {
+  str = String(str);
+
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 function toggleDarkMode() {
   const body = document.body;
-  body.setAttribute("data-theme", body.getAttribute("data-theme") === "light" ? "dark" : "light");
+
+  const nextTheme =
+    body.getAttribute("data-theme") === "light"
+      ? "dark"
+      : "light";
+
+  body.setAttribute("data-theme", nextTheme);
+
+  localStorage.setItem("theme", nextTheme);
 }
 
 function toggleSidebar() {
@@ -351,13 +396,13 @@ function toggleSidebar() {
 
 function addCategory(){
   let n = prompt("새 카테고리 이름");
-  if(n) { db.categories.push({name:n.trim(), items:[]}); save(); render(); }
+  if(n && n.trim()) { db.categories.push({name:n.trim(), items:[]}); save(); render(); }
 }
 
 function editCategory(i){
   if(db.categories[i].name === "휴지통") return;
   let n = prompt("이름 수정", db.categories[i].name);
-  if(n) { db.categories[i].name = n.trim(); save(); render(); }
+  if(n && n.trim()) { db.categories[i].name = n.trim(); save(); render(); }
 }
 
 function deleteCategory(i){
@@ -365,81 +410,146 @@ function deleteCategory(i){
   if(confirm("카테고리와 내부 메모를 모두 삭제할까요?")) { db.categories.splice(i, 1); current = 0; save(); render(); }
 }
 
-function addBlock(){
-  db.categories[current].items.push({
-    title:"", tags:"", content:"", pinned:false,
-    updated: new Date().toLocaleString(), ts: Date.now()
+function getAllTags(){
+  const set = new Set();
+
+  db.categories.forEach(cat => {
+    cat.items.forEach(item => {
+
+      (item.tags || "")
+        .split(" ")
+        .filter(Boolean)
+        .forEach(tag => set.add(tag));
+
+    });
   });
 
-  const newIndex = db.categories[current].items.length - 1;
-
-  save();
-  openAndScrollToMemo(newIndex);
+  return Array.from(set);
 }
+
+function getTagSuggestions(input){
+
+  const words =
+    input.split(" ");
+
+  const current =
+    words[words.length - 1]
+      .trim()
+      .toLowerCase();
+
+  if(!current) return [];
+
+  return getAllTags().filter(tag =>
+    tag.toLowerCase().startsWith(current)
+  );
+}
+
+function addBlock(){
+document.getElementById("search").value = "";
+activeFilters = [];
+
+const newTs = crypto.randomUUID();
+
+db.categories[current].items.push({
+title:"", tags:"", content:"", pinned:false,
+updated: new Date().toLocaleString(), ts: newTs,
+updatedTs: Date.now()
+});
+
+save();
+
+const newIndex = db.categories[current].items.findIndex(v => v.ts === newTs);
+
+openAndScrollToMemo(newIndex);
+}
+
 
 async function quickAddBlock(){
-  const input = document.getElementById("quickAddInput");
-  const title = input.value.trim();
-  if(!title) return;
+const input = document.getElementById("quickAddInput");
+const title = input.value.trim();
+if(!title) return;
 
-  let clipboardContent = "";
-  try { if (navigator.clipboard && navigator.clipboard.readText) { clipboardContent = await navigator.clipboard.readText(); } } catch (err) {}
+document.getElementById("search").value = "";
+activeFilters = [];
 
-  db.categories[current].items.push({
-    title: title, tags: "", content: clipboardContent || "", pinned: false,
-    updated: new Date().toLocaleString(), ts: Date.now()
-  });
-    const newIndex = db.categories[current].items.length - 1;
+const newTs = crypto.randomUUID();
 
-  input.value = "";
+db.categories[current].items.push({
+title:title,
+tags:"",
+content:"",
+pinned:false,
+updated: new Date().toLocaleString(),
+ts: newTs,
+updatedTs: Date.now()
+});
 
-  save();
-  openAndScrollToMemo(newIndex);
+const newIndex = db.categories[current].items.findIndex(v => v.ts === newTs);
 
-  input.focus();
+input.value = "";
+
+save();
+openAndScrollToMemo(newIndex);
+
+input.focus();
 }
 
-function updateItem(i, f, v){
-  let item = db.categories[current].items[i];
+
+let saveTimers = {};
+
+function updateItem(ts, f, v){
+  let item = db.categories[current].items.find(it => it.ts === ts);
+  if (!item) return;
   item[f] = v;
-  item.ts = Date.now();
-  item.updated = new Date().toLocaleString();
-  save();
-  
-  const card = document.querySelector(`.card[data-id="${i}"]`);
-  if(card) {
-    if(f === 'title') card.querySelector('.title').innerText = v || "새 메모";
-    else if(f === 'tags') {
-      card.querySelector('.tags-container').innerHTML = v.split(" ").filter(t=>t).map(t => `<span class="tag" onclick="event.stopPropagation(); addTagFilter('${t}')">${t}</span>`).join("");
+
+  const card = document.querySelector(`.card[data-ts="${ts}"]`); 
+  if (card) {
+    if (f === 'title') card.querySelector('.title').innerText = v || "새 메모";
+    if (f === 'content') {
+      const countDisplay = card.querySelector('.char-count');
+      if (countDisplay) countDisplay.innerText = `글자수: ${v.length}`;
     }
-    if(f === 'content') {
-        const countDisplay = card.querySelector('.char-count');
-        if(countDisplay) countDisplay.innerText = `글자수: ${v.length}`;
+  }
+
+  clearTimeout(saveTimers[ts]);
+  saveTimers[ts] = setTimeout(() => {
+    item.updatedTs = Date.now();
+    item.updated = new Date().toLocaleString();
+    save();
+
+    // [중요] 수정 중일 때는 리스트를 다시 그리지(render) 않는다냥! (카드가 도망가는 것 방지)
+    if (!openStates[ts]?.isEditing) {
+      render();
     }
+  }, 500);
+}
+
+function clearContent(ts) {
+  if (confirm("내용을 모두 비울까요?")) {
+    updateItem(ts, 'content', '');
+    render();
   }
 }
 
-function clearContent(i){
-    if(confirm("내용을 모두 비울까요?")) {
-        updateItem(i, 'content', '');
-        render();
-    }
-}
-
-function deleteBlock(i, e){
-  if(e) e.stopPropagation();
+function deleteBlockByTs(ts, e) {
+  if (e) e.stopPropagation();
   const isTrash = db.categories[current].name === "휴지통";
-  if(!confirm(isTrash ? "영구 삭제할까요?" : "휴지통으로 보낼까요?")) return;
-  
-  if(isTrash) {
-    db.categories[current].items.splice(i, 1);
+  if (!confirm(isTrash ? "영구 삭제할까요?" : "휴지통으로 보낼까요?")) return;
+
+  const idx = db.categories[current].items.findIndex(it => it.ts === ts);
+  if (idx === -1) return;
+
+  if (isTrash) {
+    db.categories[current].items.splice(idx, 1);
   } else {
-    let item = db.categories[current].items.splice(i, 1)[0];
-    let trashCat = db.categories.find(c => c.name === "휴지통");
-    if(!trashCat) { trashCat = {name:"휴지통", items:[]}; db.categories.push(trashCat); }
+    let item = db.categories[current].items.splice(idx, 1)[0];
+    let trashCat = db.categories.find(c => c.name === "휴지통") || {name:"휴지통", items:[]};
     trashCat.items.unshift(item);
   }
-  delete openStates[i]; save(); render();
+  
+  delete openStates[ts];
+  save(); 
+  render();
 }
 
 function emptyTrash() {
@@ -449,11 +559,15 @@ function emptyTrash() {
   }
 }
 
-function moveBlock(i, targetIdx){
-  if(targetIdx === "") return;
-  let item = db.categories[current].items.splice(i, 1)[0];
-  db.categories[targetIdx].items.unshift(item);
-  save(); render();
+function moveBlock(ts, targetIdx) {
+  if (targetIdx === "") return;
+  const idx = db.categories[current].items.findIndex(it => it.ts === ts);
+  if (idx !== -1) {
+    let item = db.categories[current].items.splice(idx, 1)[0];
+    db.categories[targetIdx].items.unshift(item);
+    save();
+    render();
+  }
 }
 
 function addTagFilter(tag){
@@ -470,66 +584,119 @@ function toggleBulkMode() {
   render();
 }
 
-function selectItem(idx) {
-  if(selectedItems.has(idx)) selectedItems.delete(idx);
-  else selectedItems.add(idx);
+function selectItem(ts) {
+  if(selectedItems.has(ts)) selectedItems.delete(ts);
+  else selectedItems.add(ts);
+
   render();
 }
 
 function executeBulkDelete() {
-  if(selectedItems.size === 0) return;
-  const isTrash = db.categories[current].name === "휴지통";
-  if(!confirm(`${selectedItems.size}개를 ${isTrash ? '영구 삭제' : '이동'}할까요?`)) return;
-  let targets = Array.from(selectedItems).sort((a,b) => b - a);
-  let trashCat = db.categories.find(c => c.name === "휴지통");
-  if(!trashCat) { trashCat = {name:"휴지통", items:[]}; db.categories.push(trashCat); }
-  
-  targets.forEach(idx => {
-    let item = db.categories[current].items.splice(idx, 1)[0];
-    if(!isTrash) trashCat.items.unshift(item);
-  });
-  save(); isBulkMode = false; selectedItems.clear(); render();
-}
 
-function toggleBlock(i){
-  if(isBulkMode) { selectItem(i); return; }
-  if(!openStates[i]) openStates[i] = { isOpen: false, isEditing: false };
-  openStates[i].isOpen = !openStates[i].isOpen;
-  if(!openStates[i].isOpen) openStates[i].isEditing = false;
+  if(selectedItems.size === 0) return;
+
+  const isTrash =
+    db.categories[current].name === "휴지통";
+
+  if(
+    !confirm(
+      `${selectedItems.size}개를 ${isTrash ? '영구 삭제' : '이동'}할까요?`
+    )
+  ) return;
+
+  let targets = Array.from(selectedItems);
+
+  let trashCat = db.categories.find(
+    c => c.name === "휴지통"
+  );
+
+  if(!trashCat) {
+    trashCat = {
+      name:"휴지통",
+      items:[]
+    };
+
+    db.categories.push(trashCat);
+  }
+
+  targets.forEach(ts => {
+
+    const idx =
+      db.categories[current].items.findIndex(
+        v => v.ts === ts
+      );
+
+    if(idx === -1) return;
+
+    let item =
+      db.categories[current].items.splice(idx, 1)[0];
+
+    if(!isTrash) {
+      trashCat.items.unshift(item);
+    }
+
+  });
+
+  save();
+
+  isBulkMode = false;
+
+  selectedItems.clear();
+
   render();
 }
 
-function togglePin(idx, e){
+function toggleBlock(ts) {
+  if (isBulkMode) {
+    selectItem(ts);
+    return;
+  }
+  if (!openStates[ts]) openStates[ts] = { isOpen: false, isEditing: false };
+  openStates[ts].isOpen = !openStates[ts].isOpen;
+  if (!openStates[ts].isOpen) openStates[ts].isEditing = false;
+  render();
+}
+
+function togglePin(ts, e) {
   e.stopPropagation();
-  let item = db.categories[current].items[idx];
-  item.pinned = !item.pinned;
-  save(); render();
+  let item = db.categories[current].items.find(it => it.ts === ts);
+  if (item) {
+    item.pinned = !item.pinned;
+    save();
+    render();
+  }
 }
 
 function openAndScrollToMemo(idx){
-  openStates[idx] = {
-    isOpen: true,
-    isEditing: true
-  };
+  let ts = db.categories[current].items[idx].ts; // 인덱스 대신 고유 ID 사용
+  openStates[ts] = {
+    isOpen: true,
+    isEditing: true
+  };
 
-  render();
+  render();
 
-  requestAnimationFrame(() => {
-    const card = document.querySelector(`.card[data-id="${idx}"]`);
-    if(card){
-      card.scrollIntoView({
-        behavior: "smooth",
-        block: "start"
-      });
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const card = document.querySelector(`.card[data-ts="${ts}"]`);
 
-      const textarea = card.querySelector("textarea");
-      if(textarea){
-        textarea.focus();
-      }
-    }
-  });
+      if(card){
+        card.scrollIntoView({
+          behavior: "smooth",
+          block: "start"
+        });
+
+        const textarea = card.querySelector("textarea");
+
+        if(textarea){
+          setTimeout(() => {
+            textarea.focus();
+          }, 150);
+        }
+      }
+    });
+  });
 }
-
 
 function render(){
   const list = document.getElementById("list");
@@ -546,7 +713,7 @@ function render(){
     const d = document.createElement("div");
     d.className = `category ${i === current ? 'active' : ''}`;
     d.onclick = () => { current = i; isBulkMode = false; selectedItems.clear(); render(); };
-    d.innerHTML = `<span>${c.name} <span class="cat-count">(${c.items.length})</span></span>
+    d.innerHTML = `<span>${escapeHtml(c.name)} <span class="cat-count">(${c.items.length})</span></span>
       <div class="cat-actions">
         ${c.name !== "휴지통" ? `<button class="cat-btn" onclick="event.stopPropagation(); editCategory(${i})">✏️</button>` : ''}
         ${i !== 0 && c.name !== "휴지통" ? `<button class="cat-btn" onclick="event.stopPropagation(); deleteCategory(${i})">❌</button>` : ''}
@@ -585,112 +752,249 @@ function render(){
   let items = db.categories[current].items.map((item, idx) => ({item, idx}));
   if(sort === "title_asc") items.sort((a,b) => a.item.title.localeCompare(b.item.title));
   else if(sort === "title_desc") items.sort((a,b) => b.item.title.localeCompare(a.item.title));
-  else if(sort === "updated_desc") items.sort((a,b) => b.item.ts - a.item.ts);
-  else if(sort === "updated_asc") items.sort((a,b) => a.item.ts - b.item.ts);
+  else if(sort === "updated_desc") items.sort((a,b) => b.item.updatedTs - a.item.updatedTs);
+  else if(sort === "updated_asc") items.sort((a,b) => a.item.updatedTs - b.item.updatedTs);
   else if(sort === "default") items.sort((a,b) => (b.item.pinned ? 1 : 0) - (a.item.pinned ? 1 : 0));
 
-  items.forEach(({item, idx}) => {
-    const matchesSearch = item.title.toLowerCase().includes(keyword) || item.tags.toLowerCase().includes(keyword) || item.content.toLowerCase().includes(keyword);
-    const matchesTags = activeFilters.length === 0 || activeFilters.every(f => item.tags.includes(f));
-    if(!matchesSearch || !matchesTags) return;
+items.forEach(({item, idx}) => {
+    const matchesSearch = (item.title || "").toLowerCase().includes(keyword) || (item.tags || "").toLowerCase().includes(keyword) || (item.content || "").toLowerCase().includes(keyword);
+    const matchesTags =
+      activeFilters.length === 0 ||
+      activeFilters.every(f =>
+        (item.tags || "").includes(f)
+      );
+    if(!matchesSearch || !matchesTags) return;
 
-    const card = document.createElement("div");
-    let state = openStates[idx] || { isOpen: false, isEditing: false };
-    
-    card.className = `card ${item.pinned ? 'pinned' : ''} ${isBulkMode ? 'selectable' : ''} ${selectedItems.has(idx) ? 'selected' : ''} ${state.isEditing ? 'editing-active' : ''}`;
-    card.setAttribute("data-id", idx); 
+    const card = document.createElement("div");
+    // 수정됨: idx 대신 item.ts로 상태를 확인
+    let state = openStates[item.ts] || { isOpen: false, isEditing: false };
+    
+    card.className = `card ${item.pinned ? 'pinned' : ''} ${isBulkMode ? 'selectable' : ''} ${selectedItems.has(item.ts) ? 'selected' : ''} ${state.isEditing ? 'editing-active' : ''}`;
+    card.setAttribute("data-ts", item.ts); 
 
-    card.innerHTML = `
-      <div class="card-header" onclick="toggleBlock(${idx})">
-        <div class="card-header-top">
-          <div class="card-header-title">
-            <span class="handle" onclick="event.stopPropagation()">⠿</span>
-            <span class="title">${item.title || "새 메모"}</span>
-          </div>
-        </div>
-        <div class="tags-container">
-          ${item.tags.split(" ").filter(t=>t).map(t => `<span class="tag" onclick="event.stopPropagation(); addTagFilter('${t}')">${t}</span>`).join("")}
-        </div>
-        <div class="card-header-bottom">
-          <span class="date">${item.updated}</span>
-          <button class="pin ${item.pinned ? 'active' : ''}" onclick="togglePin(${idx}, event)">★</button>
-        </div>
-      </div>
-      <div class="detail ${state.isOpen ? 'open' : ''}">
-        <input placeholder="제목" value="${item.title}" oninput="updateItem(${idx}, 'title', this.value)">
-        <input placeholder="태그 (공백 구분)" value="${item.tags}" oninput="updateItem(${idx}, 'tags', this.value)">
-        ${state.isEditing ? 
-          `<textarea oninput="updateItem(${idx}, 'content', this.value)" 
-                     onpointerdown="event.stopPropagation()" 
-                     ontouchstart="event.stopPropagation()"
-                     autofocus>${item.content}</textarea>` :
-          `<div class="content-preview" onclick="openStates[${idx}].isEditing=true; render();">${marked.parse(item.content || "클릭하여 내용 입력")}</div>`
-        }
-        <div class="char-count">글자수: ${(item.content || "").length}</div>
-        
-        <div class="action-buttons">
-          <select onchange="moveBlock(${idx}, this.value)" style="padding:6px; border-radius:6px; font-size:12px; border:1px solid var(--border);">
-            <option value="">이동...</option>
-            ${db.categories.map((c,i)=>`<option value="${i}">${c.name}</option>`).join("")}
-          </select>
-          <button class="btn-ui" onclick="copyText(${idx}, this)">복사</button>
-          <button class="btn-ui" onclick="clearContent(${idx})">비우기</button>
-          <button class="btn-ui danger" onclick="deleteBlock(${idx}, event)">삭제</button>
-          <button class="btn-ui primary" onclick="toggleBlock(${idx})" style="margin-left:auto;">닫기</button>
-        </div>
-      </div>
-    `;
-    list.appendChild(card);
-  });
+    card.innerHTML = `
+      <div class="card-header" onclick="toggleBlock('${item.ts}')">
+        <div class="card-header-top">
+          <div class="card-header-title">
+            <span class="handle" onclick="event.stopPropagation()">⠿</span>
+            <span class="title">${escapeHtml(item.title || "새 메모")}</span>
+          </div>
+        </div>
+        <div class="tags-container">
+          ${(item.tags || "").split(" ").filter(t=>t).map(t => {
+                                                  const safeTag = escapeHtml(t);
+                                                  return `<span class="tag" onclick='event.stopPropagation(); addTagFilter(${JSON.stringify(t)})'>${safeTag}</span>`;
+                                                }).join("")}
+        </div>
+        <div class="card-header-bottom">
+          <span class="date">${item.updated}</span>
+          <button class="pin ${item.pinned ? 'active' : ''}" onclick="togglePin('${item.ts}', event)">★</button>
+        </div>
+      </div>
+      <div class="detail ${state.isOpen ? 'open' : ''}">
+        <input placeholder="제목" value="${escapeHtml(item.title || "")}" oninput="updateItem('${item.ts}', 'title', this.value)">
+        <div>
+          <input
+            placeholder="태그 (공백 구분)"
+            value="${escapeHtml(item.tags || "")}"
+            oninput="
+              updateItem('${item.ts}', 'tags', this.value);
+              refreshTagSuggestions(this, '${item.ts}');
+            "
+            id="tag-input-${item.ts}"
+          >
+        
+          <div class="tag-suggest-box" id="tag-suggest-${item.ts}">
+            ${
+              getTagSuggestions(item.tags || "")
+              .slice(0,5)
+              .map(tag => `
+                <div class="tag-suggest-item"
+                  onclick="
+                    const input =
+                      document.getElementById('tag-input-${item.ts}');
+        
+                    let words =
+                      input.value.split(' ');
+        
+                    words[words.length - 1] = ${JSON.stringify(tag)};
+        
+                    input.value = words.join(' ');
+        
+                    updateItem('${item.ts}', 'tags', input.value);
+        
+                    render();
+                  "
+                >
+                  ${escapeHtml(tag)}
+                </div>
+              `).join("")
+            }
+          </div>
+        </div>
+        ${state.isEditing ? 
+          `<textarea 
+             oninput="updateItem('${item.ts}', 'content', this.value)"
+             onblur="
+             if(openStates['${item.ts}']) {
+               openStates['${item.ts}'].isEditing = false;
+             }
+             setTimeout(() => render(), 0);
+             "
+                     onpointerdown="event.stopPropagation()"  
+                     ontouchstart="event.stopPropagation()"
+                     autofocus>${escapeHtml(item.content)}</textarea>` :
+          // 수정됨: 내용 클릭 시에도 idx 대신 item.ts 기반으로 수정 모드 전환
+          `<div class="content-preview" onclick="
+if(!openStates['${item.ts}']) {
+  openStates['${item.ts}'] = { isOpen:true, isEditing:true };
+}
+openStates['${item.ts}'].isEditing=true;
+render();
+">${DOMPurify.sanitize(marked.parse(item.content || "클릭하여 내용 입력"))}</div>`
+        }
+        <div class="char-count">글자수: ${(item.content || "").length}</div>
+        
+        <div class="action-buttons">
+          <select onchange="moveBlock('${item.ts}', this.value)" style="padding:6px; border-radius:6px; font-size:12px; border:1px solid var(--border);">
+            <option value="">이동...</option>
+            ${db.categories.map((c,i)=>`<option value="${i}">${c.name}</option>`).join("")}
+          </select>
+          <button class="btn-ui" onclick="copyText('${item.ts}', this)">복사</button>
+          <button class="btn-ui" onclick="clearContent('${item.ts}')">비우기</button>
+          <button class="btn-ui danger" onclick="deleteBlockByTs('${item.ts}', event)">삭제</button>
+          <button class="btn-ui primary" onclick="toggleBlock('${item.ts}')" style="margin-left:auto;">닫기</button>
+        </div>
+      </div>
+    `;
+    list.appendChild(card);
+  });
 
-  if (sortableInstance) { try { sortableInstance.destroy(); } catch (e) {} }
-  if(canSort) {
-    sortableInstance = Sortable.create(list, {
-      handle: ".handle", 
-      animation: 150,
-      delay: 50,
-      delayOnTouchOnly: true,
-      // 수정: textarea 요소를 드래그 대상에서 명확히 제외
-      filter: "textarea, input",
-      preventOnFilter: false,
-      onEnd: (evt) => {
-        let arr = db.categories[current].items;
-        let moved = arr.splice(evt.oldIndex, 1)[0];
-        arr.splice(evt.newIndex, 0, moved);
-        save();
-      }
-    });
-  }
+  if (sortableInstance) { try { sortableInstance.destroy(); } catch (e) {} }
+  if(canSort) {
+    sortableInstance = Sortable.create(list, {
+      handle: ".handle", 
+      animation: 150,
+      delay: 50,
+      delayOnTouchOnly: true,
+      filter: "textarea, input",
+      preventOnFilter: false,
+      onEnd: (evt) => {
+        let arr = db.categories[current].items;
+        let moved = arr.splice(evt.oldIndex, 1)[0];
+        arr.splice(evt.newIndex, 0, moved);
+        save();
+        render(); // 수정됨: 이벤트 엉킴을 방지하기 위해 정렬 후 반드시 렌더링 호출
+      }
+    });
+  }
 }
 
-function copyText(i, btn){
-  const text = db.categories[current].items[i].content;
-  const dummy = document.createElement("textarea");
-  document.body.appendChild(dummy);
-  dummy.value = text; dummy.select();
-  document.execCommand("copy");
-  document.body.removeChild(dummy);
-  let t = btn.innerText; btn.innerText = "완료!";
+async function copyText(ts, btn) {
+  const item = db.categories[current].items.find(it => it.ts === ts);
+  const text = item ? (item.content || "") : "";
+
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (err) {
+    const dummy = document.createElement("textarea");
+    document.body.appendChild(dummy);
+    dummy.value = text;
+    dummy.select();
+    document.execCommand("copy");
+    document.body.removeChild(dummy);
+  }
+
+  let t = btn.innerText;
+  btn.innerText = "완료!";
   setTimeout(() => btn.innerText = t, 1000);
 }
 
 function exportData(){
   const blob = new Blob([JSON.stringify(db)], {type:"application/json"});
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
+  const url = URL.createObjectURL(blob);
+  a.href = url;
   a.download = `backup_${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function importData(e){
   const file = e.target.files[0];
   if(!file) return;
+
   const reader = new FileReader();
-  reader.onload = () => { try { db = JSON.parse(reader.result); save(); render(); } catch(e){ alert("잘못된 파일입니다."); } };
+
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(reader.result);
+
+      if(!parsed || !Array.isArray(parsed.categories)) {
+        alert("잘못된 파일입니다.");
+        return;
+      }
+
+      db = parsed;
+      db.categories.forEach(cat => {
+        if(!Array.isArray(cat.items)) {
+          cat.items = [];
+        }
+      });
+      db.categories.forEach(cat => {
+        cat.items.forEach(item => {
+          if(!item.ts) item.ts = crypto.randomUUID();
+          if(!item.updatedTs) {
+            item.updatedTs = new Date(item.updated).getTime() || Date.now();
+          }
+        });
+      });
+      save();
+      render();
+    } catch(e){
+      alert("잘못된 파일입니다.");
+    }
+  };
+
   reader.readAsText(file);
 }
 
-window.onload = render;
+
+window.onload = () => {
+  const savedTheme = localStorage.getItem("theme");
+
+  if(savedTheme){
+    document.body.setAttribute("data-theme", savedTheme);
+  }
+
+  render();
+};
+
+function refreshTagSuggestions(inputEl, ts) { // idx 파라미터 삭제
+  const box = document.getElementById(`tag-suggest-${ts}`);
+  if (!box) return;
+
+  const tags = getTagSuggestions(inputEl.value).slice(0, 5);
+  box.innerHTML = tags.map(tag => `
+      <div class="tag-suggest-item"
+        onclick="
+          let words = document.getElementById('tag-input-${ts}').value.split(' ');
+          words[words.length - 1] = '${tag}';
+          const finalValue = words.join(' ');
+          document.getElementById('tag-input-${ts}').value = finalValue;
+          updateItem('${ts}', 'tags', finalValue);
+          render();
+        "
+      >
+        ${tag}
+      </div>
+    `).join("");
+}
+
+
+
 </script>
 </body>
 </html>
