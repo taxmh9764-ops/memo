@@ -239,6 +239,13 @@ body {
   word-break: break-all;
 }
 
+.char-count {
+  text-align: right;
+  font-size: 11px;
+  color: var(--text-sub);
+  margin-top: 4px;
+}
+
 textarea {
   width: 100%;
   box-sizing: border-box;
@@ -306,8 +313,6 @@ textarea {
 // PWA 서비스 워커 등록 로직 수정 (blob 프로토콜 에러 방지)
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    // blob 대신 실제 파일 경로를 사용하거나, 에러 시나리오를 방지하기 위해 try-catch 처리
-    // 현재 단일 파일 환경에서는 완전한 SW 등록이 어려울 수 있으나 에러를 차단합니다.
     try {
       const swCode = `
         const CACHE_NAME = 'work-memo-pro-v1';
@@ -318,7 +323,6 @@ if ('serviceWorker' in navigator) {
       const blob = new Blob([swCode], { type: 'application/javascript' });
       const url = URL.createObjectURL(blob);
       navigator.serviceWorker.register(url).catch(err => {
-        // 일부 브라우저의 blob 차단 정책에 대한 예외 처리
         console.warn('Service Worker registration skipped (expected in some sandbox environments).');
       });
     } catch (e) {
@@ -404,7 +408,20 @@ function updateItem(i, f, v){
     else if(f === 'tags') {
       card.querySelector('.tags-container').innerHTML = v.split(" ").filter(t=>t).map(t => `<span class="tag" onclick="event.stopPropagation(); addTagFilter('${t}')">${t}</span>`).join("");
     }
+    // 글자수 실시간 업데이트
+    if(f === 'content') {
+        const countDisplay = card.querySelector('.char-count');
+        if(countDisplay) countDisplay.innerText = `글자수: ${v.length}`;
+    }
   }
+}
+
+// 2번 요청 기능: 내용 비우기 함수 추가
+function clearContent(i){
+    if(confirm("내용을 모두 비울까요?")) {
+        updateItem(i, 'content', '');
+        render();
+    }
 }
 
 function deleteBlock(i, e){
@@ -578,12 +595,17 @@ function render(){
           `<textarea oninput="updateItem(${idx}, 'content', this.value)" autofocus>${item.content}</textarea>` :
           `<div class="content-preview" onclick="openStates[${idx}].isEditing=true; render();">${marked.parse(item.content || "클릭하여 내용 입력")}</div>`
         }
+        <!-- 1번 요청 기능: 글자수 체크 UI 추가 -->
+        <div class="char-count">글자수: ${(item.content || "").length}</div>
+        
         <div class="action-buttons">
           <select onchange="moveBlock(${idx}, this.value)" style="padding:6px; border-radius:6px; font-size:12px; border:1px solid var(--border);">
             <option value="">이동...</option>
             ${db.categories.map((c,i)=>`<option value="${i}">${c.name}</option>`).join("")}
           </select>
           <button class="btn-ui" onclick="copyText(${idx}, this)">복사</button>
+          <!-- 2번 요청 기능: 내용 비우기 버튼 추가 -->
+          <button class="btn-ui" onclick="clearContent(${idx})">비우기</button>
           <button class="btn-ui danger" onclick="deleteBlock(${idx}, event)">삭제</button>
           <button class="btn-ui primary" onclick="toggleBlock(${idx})" style="margin-left:auto;">닫기</button>
         </div>
