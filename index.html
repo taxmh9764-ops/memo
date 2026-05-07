@@ -155,33 +155,90 @@ body {
 }
 .header input:focus { border-color: var(--accent); }
 
+/* --- 모바일 UI 최적화 개편 --- */
 @media (max-width: 768px) {
-  #sidebarToggle { display: inline-block; }
-  .sidebar { 
-    position: fixed; left: -240px; top: 0; bottom: 0; 
-    z-index: 1000; transition: left 0.3s ease; 
-    box-shadow: 2px 0 10px rgba(0,0,0,0.1);
-  }
-  .sidebar.open { left: 0; }
-  .sidebar-overlay { 
-    display: none; position: fixed; inset: 0; 
-    background: rgba(0,0,0,0.4); z-index: 999; 
-  }
-  .sidebar.open + .sidebar-overlay { display: block; }
+  /* 1. 전체 여백 조정 */
+  body { font-size: 14px; }
+  
+  .main { padding: 0; } /* 메인 영역 여백 제거 */
 
-  .header { padding: 12px 10px; gap: 10px; }
-  #header-actions { overflow-x: auto; white-space: nowrap; padding-bottom: 2px; }
-  #header-actions::-webkit-scrollbar { display: none; }
-  
-  .search-input-group { 
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
+  /* 2. 헤더: 작고 세련되게 */
+  .header { 
+    padding: 10px 12px; 
+    gap: 8px; 
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  }
+
+  .header-top { margin-bottom: 4px; }
+
+  /* 검색창과 퀵추가 가로 배치 최적화 */
+  .search-input-group {
+    display: flex; /* 그리드 대신 플렉스로 꽉 차게 */
+    flex-direction: row;
+    gap: 6px;
   }
   
-  .header input, .header select { font-size: 14px; padding: 10px 8px; }
-  .btn-ui { padding: 8px 12px; font-size: 14px; }
-  #sortMode { font-size: 13px; padding: 6px; }
+  #search { flex: 1.2; min-width: 0; }
+  .quick-add-container { flex: 1; min-width: 0; }
+  
+  .header input { 
+    padding: 8px 10px; 
+    font-size: 13px; 
+    border-radius: 8px; 
+  }
+
+  /* 3. 메모 카드: 산만함 제거 및 꽉 차게 */
+  .card {
+    margin: 8px 12px; /* 카드 사이 간격 조절 */
+    padding: 14px;
+    border-radius: 12px;
+    width: auto; /* 고정 크기 제거 */
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+
+  .title { 
+    font-size: 16px; 
+    text-align: left; /* 가운데 정렬 방지 */
+  }
+
+  /* 4. 버튼 및 UI 요소 크기 조정 */
+  .btn-ui { 
+    padding: 6px 10px; 
+    font-size: 13px; 
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #sortMode { 
+    padding: 5px; 
+    font-size: 12px; 
+    border-radius: 6px;
+  }
+
+  /* 5. 상세 내용 영역 가독성 */
+  textarea {
+    font-size: 15px; /* 모바일 입력 시 자동 줌 방지 */
+    min-height: 200px;
+  }
+
+  .action-buttons {
+    display: grid; /* 버튼들을 정돈된 격자로 */
+    grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+    gap: 6px;
+  }
+
+  .action-buttons .primary {
+    grid-column: span 2; /* 닫기 버튼은 길게 */
+    margin-left: 0 !important;
+  }
+
+  /* 6. 사이드바 애니메이션 개선 */
+  .sidebar {
+    width: 260px;
+    left: -260px;
+  }
 }
 
 .main { flex:1; min-width: 0; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; }
@@ -260,6 +317,8 @@ textarea {
   box-sizing: border-box;
   resize: vertical;
   min-height: 150px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 12px;
   border-radius: 6px;
   border: 1px solid var(--accent);
