@@ -272,7 +272,7 @@ textarea {
   background: var(--bg-card);
   color: var(--text-main);
   font-family: inherit;
-  touch-action: pan-y;
+  touch-action: auto; 
   overflow-y: auto;
 }
 
@@ -723,7 +723,7 @@ function render(){
           <button class="pin ${item.pinned ? 'active' : ''}" onclick="togglePin('${item.ts}', event)">★</button>
         </div>
       </div>
-      <div class="detail ${state.isOpen ? 'open' : ''}" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()">
+      <div class="detail ${state.isOpen ? 'open' : ''}">
         <input placeholder="제목" value="${escapeHtml(item.title || "")}" 
                onfocus="if(!openStates['${item.ts}']) openStates['${item.ts}']={}; openStates['${item.ts}'].isEditing=true;"
                onblur="handleMemoBlur('${item.ts}')"
@@ -739,7 +739,9 @@ function render(){
         ${state.isEditing ? 
           `<textarea oninput="updateItem('${item.ts}', 'content', this.value)"
                      onblur="handleMemoBlur('${item.ts}')"
-                     onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()"
+                     onpointerdown="event.stopPropagation()"
+                     onmousedown="event.stopPropagation()" 
+                     ontouchstart="event.stopPropagation()"
                      autofocus>${escapeHtml(item.content)}</textarea>` :
           `<div class="content-preview" onclick="if(!openStates['${item.ts}']) { openStates['${item.ts}'] = { isOpen:true, isEditing:true }; } openStates['${item.ts}'].isEditing=true; render();">
             ${DOMPurify.sanitize(marked.parse(item.content || "클릭하여 내용 입력"))}
