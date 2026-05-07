@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -5,6 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>업무 메모 Pro</title>
 
+<!-- PWA 설정: 매니페스트 및 테마 색상 -->
 <link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogInVwc2FuZyBNZW1vIFBybyIsCiAgInNob3J0X25hbWUiOiAi7JeF66y066mU66qoIiwKICAic3RhcnRfdXJsIjogIi4iLAogICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiNmOGY5ZmEiLAogICJ0aGVtZV9jb2xvciI6ICIjMDk4NGUzIiwKICAiaWNvbnMiOiBbCiAgICB7CiAgICAgICJzcmMiOiAiaHR0cHM6Ly9jZG4taWNvbnMtcG5nLmZsYXRpY29uLmNvbS81MTIvODg5Lzg4OTY0OC5wbmciLAogICAgICAic2l6ZXMiOiAiNTEyeDUxMiIsCiAgICAgICJ0eXBlIjogImltYWdlL3BuZyIsCiAgICAgICJwdXJwb3NlIjogImFueSBtYXNrYWJsZSIKICAgIH0KICBdCn0=">
 <meta name="theme-color" content="#0984e3">
 
@@ -481,7 +483,8 @@ async function quickAddBlock(){
 let saveTimers = {};
 
 function updateItem(ts, f, v){
-  let item = db.categories[current].items.find(it => it.ts === ts);
+  // 수정 핵심: ts 값이 숫자형일 수 있으므로 느슨한 비교(==)를 사용함
+  let item = db.categories[current].items.find(it => it.ts == ts);
   if (!item) return;
   item[f] = v;
 
@@ -538,7 +541,7 @@ function deleteBlockByTs(ts, e) {
   if (e) e.stopPropagation();
   const isTrash = db.categories[current].name === "휴지통";
   if (!confirm(isTrash ? "영구 삭제할까요?" : "휴지통으로 보낼까요?")) return;
-  const idx = db.categories[current].items.findIndex(it => it.ts === ts);
+  const idx = db.categories[current].items.findIndex(it => it.ts == ts);
   if (idx === -1) return;
   if (isTrash) {
     db.categories[current].items.splice(idx, 1);
@@ -561,7 +564,7 @@ function emptyTrash() {
 
 function moveBlock(ts, targetIdx) {
   if (targetIdx === "") return;
-  const idx = db.categories[current].items.findIndex(it => it.ts === ts);
+  const idx = db.categories[current].items.findIndex(it => it.ts == ts);
   if (idx !== -1) {
     let item = db.categories[current].items.splice(idx, 1)[0];
     db.categories[targetIdx].items.unshift(item);
@@ -597,7 +600,7 @@ function executeBulkDelete() {
   let targets = Array.from(selectedItems);
   let trashCat = db.categories.find(c => c.name === "휴지통") || { name:"휴지통", items:[] };
   targets.forEach(ts => {
-    const idx = db.categories[current].items.findIndex(v => v.ts === ts);
+    const idx = db.categories[current].items.findIndex(v => v.ts == ts);
     if(idx === -1) return;
     let item = db.categories[current].items.splice(idx, 1)[0];
     if(!isTrash) trashCat.items.unshift(item);
@@ -621,7 +624,7 @@ function toggleBlock(ts) {
 
 function togglePin(ts, e) {
   e.stopPropagation();
-  let item = db.categories[current].items.find(it => it.ts === ts);
+  let item = db.categories[current].items.find(it => it.ts == ts);
   if (item) {
     item.pinned = !item.pinned;
     save();
@@ -822,7 +825,7 @@ function refreshTagSuggestions(inputEl, ts) {
 }
 
 async function copyText(ts, btn) {
-  const item = db.categories[current].items.find(it => it.ts === ts);
+  const item = db.categories[current].items.find(it => it.ts == ts);
   const text = item ? (item.content || "") : "";
   try {
     await navigator.clipboard.writeText(text);
@@ -863,9 +866,11 @@ function importData(e){
       db.categories.forEach(cat => {
         if(!Array.isArray(cat.items)) cat.items = [];
         cat.items.forEach(item => {
-          // 수정 사항: 첨부 파일에 있는 기존 데이터의 'id'를 'ts'로 통합 변환
+          // 수정 사항: id 필드를 ts로 통합하며 모든 ts를 문자열로 변환하여 형식 통일
           if (!item.ts) {
-            item.ts = item.id || crypto.randomUUID();
+            item.ts = String(item.id || crypto.randomUUID());
+          } else {
+            item.ts = String(item.ts); // 숫자형 ts를 문자열로 변환
           }
           if(!item.updatedTs) {
              const dt = new Date(item.updated).getTime();
@@ -888,3 +893,5 @@ window.onload = () => {
 </script>
 </body>
 </html>
+
+```
