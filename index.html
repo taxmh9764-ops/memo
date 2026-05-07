@@ -738,10 +738,10 @@ function render(){
         <div>
           <input placeholder="태그 (공백 구분)" value="${escapeHtml(item.tags || "")}"
                  onfocus="if(!openStates['${item.ts}']) openStates['${item.ts}']={}; openStates['${item.ts}'].isEditing=true;"
-                 onblur="handleMemoBlur('${item.ts}')"
+                 onblur="if(!document.getElementById('tag-suggest-${item.ts}').contains(event.relatedTarget)) handleMemoBlur('${item.ts}')"
                  oninput="updateItem('${item.ts}', 'tags', this.value); refreshTagSuggestions(this, '${item.ts}');"
                  id="tag-input-${item.ts}">
-          <div class="tag-suggest-box" id="tag-suggest-${item.ts}"></div>
+          <div class="tag-suggest-box" id="tag-suggest-${item.ts}" tabindex="-1"></div>
         </div>
         ${state.isEditing ? 
           `<textarea oninput="updateItem('${item.ts}', 'content', this.value)"
@@ -798,7 +798,7 @@ function refreshTagSuggestions(inputEl, ts) {
   box.style.display = 'block';
   box.innerHTML = suggestions.map(tag => `
       <div class="tag-suggest-item"
-        onmousedown="
+        onmousedown="event.preventDefault();
           const input = document.getElementById('tag-input-${ts}');
           const pos = input.selectionStart;
           let words = input.value.split(' ');
