@@ -273,7 +273,8 @@ textarea {
   background: var(--bg-card);
   color: var(--text-main);
   font-family: inherit;
-  touch-action: auto; 
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
   overflow-y: auto;
 }
 
@@ -482,6 +483,7 @@ async function quickAddBlock(){
 let saveTimers = {};
 
 function updateItem(ts, f, v){
+  ts = String(ts);
   // 수정 핵심: ts 값이 숫자형일 수 있으므로 느슨한 비교(==)를 사용함
   let item = db.categories[current].items.find(it => it.ts == ts);
   if (!item) return;
@@ -511,10 +513,6 @@ function updateItem(ts, f, v){
     item.updatedTs = Date.now();
     item.updated = new Date().toLocaleString();
     save();
-    
-    if (!openStates[ts]?.isEditing) {
-      render();
-    }
   }, 500);
 }
 
@@ -780,8 +778,11 @@ function render(){
   if(canSort) {
     sortableInstance = Sortable.create(list, {
       handle: ".handle", animation: 150, delay: 50, delayOnTouchOnly: true,
-      filter: "textarea, input, .detail", 
-      preventOnFilter: false, 
+      filter: "textarea, input, .detail",
+      preventOnFilter: true, 
+      touchStartThreshold: 10,
+      delay: 150,
+      delayOnTouchOnly: true,
       onEnd: (evt) => {
         let arr = db.categories[current].items;
         let moved = arr.splice(evt.oldIndex, 1)[0];
