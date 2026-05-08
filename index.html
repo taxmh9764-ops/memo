@@ -482,7 +482,7 @@ async function quickAddBlock(){
 let saveTimers = {};
 
 function updateItem(ts, f, v){
-  // 수정 핵심: ts 값이 숫자형일 수 있으므로 느슨한 비교(==)를 사용함
+  // ts 비교 시 타입 문제(string vs number) 방지를 위해 느슨한 비교(==) 유지
   let item = db.categories[current].items.find(it => it.ts == ts);
   if (!item) return;
   item[f] = v;
@@ -736,11 +736,13 @@ function render(){
         <input placeholder="제목" value="${escapeHtml(item.title || "")}" 
                onfocus="if(!openStates['${item.ts}']) openStates['${item.ts}']={}; openStates['${item.ts}'].isEditing=true;"
                onblur="handleMemoBlur('${item.ts}')"
+               onpointerdown="event.stopPropagation()"
                oninput="updateItem('${item.ts}', 'title', this.value)">
         <div>
           <input placeholder="태그 (공백 구분)" value="${escapeHtml(item.tags || "")}"
                  onfocus="if(!openStates['${item.ts}']) openStates['${item.ts}']={}; openStates['${item.ts}'].isEditing=true;"
                  onblur="if(!document.getElementById('tag-suggest-${item.ts}').contains(event.relatedTarget)) handleMemoBlur('${item.ts}')"
+                 onpointerdown="event.stopPropagation()"
                  oninput="updateItem('${item.ts}', 'tags', this.value); refreshTagSuggestions(this, '${item.ts}');"
                  id="tag-input-${item.ts}">
           <div class="tag-suggest-box" id="tag-suggest-${item.ts}" tabindex="-1"></div>
@@ -865,11 +867,11 @@ function importData(e){
       db.categories.forEach(cat => {
         if(!Array.isArray(cat.items)) cat.items = [];
         cat.items.forEach(item => {
-          // 수정 사항: id 필드를 ts로 통합하며 모든 ts를 문자열로 변환하여 형식 통일
+          // ID 필드 보완 및 모든 식별자를 문자열로 통일 (기존 데이터 호환성 보장)
           if (!item.ts) {
             item.ts = String(item.id || crypto.randomUUID());
           } else {
-            item.ts = String(item.ts); // 숫자형 ts를 문자열로 변환
+            item.ts = String(item.ts); 
           }
           if(!item.updatedTs) {
              const dt = new Date(item.updated).getTime();
