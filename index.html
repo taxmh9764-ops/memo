@@ -722,7 +722,7 @@ function render(){
     </select>
   `;
 
-  document.getElementById("activeTags").innerHTML = activeFilters.map(t => `<div class="tag-chip" onclick='removeTagFilter(${JSON.stringify(t)})'>${escapeHtml(t)} ✕</div>`).join("");
+  document.getElementById("activeTags").innerHTML = activeFilters.map(t => `<div class="tag-chip" onclick="removeTagFilter(${JSON.stringify(t).replace(/"/g, '&quot;')})">${escapeHtml(t)} ✕</div>`).join("");
 
   list.innerHTML = "";
   const canSort = !isFiltered && !isBulkMode && sort === "default";
@@ -846,7 +846,7 @@ function refreshTagSuggestions(inputEl, ts) {
             count += words[i].length + 1;
             if(count >= pos) { targetIdx = i; break; }
           }
-          words[targetIdx] = ${JSON.stringify(tag)};
+          words[targetIdx] = ${JSON.stringify(tag).replace(/"/g, '&quot;')};
           const finalValue = words.join(' ') + ' '; 
           input.value = finalValue;
           updateItem('${ts}', 'tags', finalValue);
