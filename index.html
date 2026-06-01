@@ -364,6 +364,16 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 let db = JSON.parse(localStorage.getItem("memoDB") || '{"categories":[{"name":"기본","items":[]},{"name":"휴지통","items":[]}]}');
 let current = 0;
 let activeFilters = [];
@@ -441,7 +451,7 @@ function getTagSuggestions(input){
 function addBlock(){
   document.getElementById("search").value = "";
   activeFilters = [];
-  const newTs = crypto.randomUUID();
+  const newTs = generateUUID();
   db.categories[current].items.push({
     title:"", tags:"", content:"", pinned:false,
     updated: new Date().toLocaleString(), ts: newTs,
@@ -466,7 +476,7 @@ async function quickAddBlock(){
 
   document.getElementById("search").value = "";
   activeFilters = [];
-  const newTs = crypto.randomUUID();
+  const newTs = generateUUID();
   db.categories[current].items.push({
     title:title, tags:"", content: clipboardText, pinned:false,
     updated: new Date().toLocaleString(), ts: newTs,
@@ -741,7 +751,7 @@ function render(){
         <div>
           <input placeholder="태그 (공백 구분)" value="${escapeHtml(item.tags || "")}"
                  onfocus="if(!openStates['${item.ts}']) openStates['${item.ts}']={}; openStates['${item.ts}'].isEditing=true;"
-                 onblur="if(!document.getElementById('tag-suggest-${item.ts}').contains(event.relatedTarget)) handleMemoBlur('${item.ts}')"
+                 onblur="if(!document.getElementById('tag-suggest-${item.ts}')?.contains(event.relatedTarget)) handleMemoBlur('${item.ts}')"
                  onpointerdown="event.stopPropagation()"
                  oninput="updateItem('${item.ts}', 'tags', this.value); refreshTagSuggestions(this, '${item.ts}');"
                  id="tag-input-${item.ts}">
@@ -785,10 +795,13 @@ function render(){
       filter: "textarea, input, .detail", 
       preventOnFilter: false, 
       onEnd: (evt) => {
+        // [오류 수정 부분] 드래그가 끝났을 때 데이터 꼬임을 방지하기 위해, 
+        // 화면에 그려진 카드의 고유 이름표(data-ts)를 추적하여 정렬하도록 수정했습니다.
+        const newOrderTs = Array.from(list.querySelectorAll('.card')).map(card => card.getAttribute('data-ts'));
         let arr = db.categories[current].items;
-        let moved = arr.splice(evt.oldIndex, 1)[0];
-        arr.splice(evt.newIndex, 0, moved);
-        save(); render();
+        arr.sort((a, b) => newOrderTs.indexOf(String(a.ts)) - newOrderTs.indexOf(String(b.ts)));
+        save(); 
+        render();
       }
     });
   }
@@ -869,7 +882,7 @@ function importData(e){
         cat.items.forEach(item => {
           // ID 필드 보완 및 모든 식별자를 문자열로 통일 (기존 데이터 호환성 보장)
           if (!item.ts) {
-            item.ts = String(item.id || crypto.randomUUID());
+            item.ts = String(item.id || generateUUID());
           } else {
             item.ts = String(item.ts); 
           }
