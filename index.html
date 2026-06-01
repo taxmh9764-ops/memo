@@ -266,7 +266,7 @@ textarea {
   width: 100%;
   box-sizing: border-box;
   resize: vertical;
-  min-height: 350px;
+  min-height: 300px;
   padding: 12px;
   border-radius: 6px;
   border: 1px solid var(--accent);
@@ -382,7 +382,13 @@ let sortableInstance = null;
 let isBulkMode = false; 
 let selectedItems = new Set(); 
 
-function save(){ localStorage.setItem("memoDB", JSON.stringify(db)); }
+function save() { 
+  try {
+    localStorage.setItem("memoDB", JSON.stringify(db)); 
+  } catch (e) {
+    alert("저장 공간이 가득 찼습니다! 오래된 메모나 휴지통을 비워주세요.");
+  }
+}
 
 function escapeHtml(str = "") {
   str = String(str);
@@ -407,13 +413,19 @@ function toggleSidebar() {
 
 function addCategory(){
   let n = prompt("새 카테고리 이름");
-  if(n && n.trim()) { db.categories.push({name:n.trim(), items:[]}); save(); render(); }
+  if(n && n.trim()) { 
+    if(n.trim() === "휴지통") return alert("이 이름은 사용할 수 없습니다!");
+    db.categories.push({name:n.trim(), items:[]}); save(); render(); 
+  }
 }
 
 function editCategory(i){
   if(db.categories[i].name === "휴지통") return;
   let n = prompt("이름 수정", db.categories[i].name);
-  if(n && n.trim()) { db.categories[i].name = n.trim(); save(); render(); }
+  if(n && n.trim()) { 
+    if(n.trim() === "휴지통") return alert("이 이름은 사용할 수 없습니다!");
+    db.categories[i].name = n.trim(); save(); render(); 
+  }
 }
 
 function deleteCategory(i){
@@ -556,7 +568,11 @@ function deleteBlockByTs(ts, e) {
     db.categories[current].items.splice(idx, 1);
   } else {
     let item = db.categories[current].items.splice(idx, 1)[0];
-    let trashCat = db.categories.find(c => c.name === "휴지통") || {name:"휴지통", items:[]};
+    let trashCat = db.categories.find(c => c.name === "휴지통");
+    if (!trashCat) {
+      trashCat = { name: "휴지통", items: [] };
+      db.categories.push(trashCat);
+    }
     trashCat.items.unshift(item);
   }
   delete openStates[ts];
@@ -607,7 +623,11 @@ function executeBulkDelete() {
   const isTrash = db.categories[current].name === "휴지통";
   if(!confirm(`${selectedItems.size}개를 ${isTrash ? '영구 삭제' : '이동'}할까요?`)) return;
   let targets = Array.from(selectedItems);
-  let trashCat = db.categories.find(c => c.name === "휴지통") || { name:"휴지통", items:[] };
+  let trashCat = db.categories.find(c => c.name === "휴지통");
+  if (!trashCat) {
+    trashCat = { name: "휴지통", items: [] };
+    db.categories.push(trashCat);
+  }
   targets.forEach(ts => {
     const idx = db.categories[current].items.findIndex(v => v.ts == ts);
     if(idx === -1) return;
@@ -702,7 +722,7 @@ function render(){
     </select>
   `;
 
-  document.getElementById("activeTags").innerHTML = activeFilters.map(t => `<div class="tag-chip" onclick="removeTagFilter('${t}')">${t} ✕</div>`).join("");
+  document.getElementById("activeTags").innerHTML = activeFilters.map(t => `<div class="tag-chip" onclick='removeTagFilter(${JSON.stringify(t)})'>${escapeHtml(t)} ✕</div>`).join("");
 
   list.innerHTML = "";
   const canSort = !isFiltered && !isBulkMode && sort === "default";
@@ -718,7 +738,8 @@ function render(){
 
   items.forEach(({item, idx}) => {
     const matchesSearch = (item.title || "").toLowerCase().includes(keyword) || (item.tags || "").toLowerCase().includes(keyword) || (item.content || "").toLowerCase().includes(keyword);
-    const matchesTags = activeFilters.length === 0 || activeFilters.every(f => (item.tags || "").includes(f));
+    const tagList = (item.tags || "").split(" ").filter(Boolean);
+    const matchesTags = activeFilters.length === 0 || activeFilters.every(f => tagList.includes(f));
     if(!matchesSearch || !matchesTags) return;
 
     const card = document.createElement("div");
@@ -770,9 +791,9 @@ function render(){
         }
         <div class="char-count">글자수: ${(item.content || "").length}</div>
         <div class="action-buttons">
-          <select onchange="moveBlock('${item.ts}', this.value)" style="padding:6px; border-radius:6px; font-size:12px; border:1px solid var(--border);">
+        <select onchange="moveBlock('${item.ts}', this.value)" style="padding:6px; border-radius:6px; font-size:12px; border:1px solid var(--border);">
             <option value="">이동...</option>
-            ${db.categories.map((c,i)=>`<option value="${i}">${c.name}</option>`).join("")}
+            ${db.categories.map((c,i)=>`<option value="${i}">${escapeHtml(c.name)}</option>`).join("")}
           </select>
           <button class="btn-ui" onclick="copyText('${item.ts}', this)">복사</button>
           <button class="btn-ui" onclick="clearContent('${item.ts}')">비우기</button>
@@ -825,7 +846,7 @@ function refreshTagSuggestions(inputEl, ts) {
             count += words[i].length + 1;
             if(count >= pos) { targetIdx = i; break; }
           }
-          words[targetIdx] = '${tag}';
+          words[targetIdx] = ${JSON.stringify(tag)};
           const finalValue = words.join(' ') + ' '; 
           input.value = finalValue;
           updateItem('${ts}', 'tags', finalValue);
@@ -877,7 +898,16 @@ function importData(e){
       const parsed = JSON.parse(reader.result);
       if(!parsed || !Array.isArray(parsed.categories)) { alert("잘못된 파일입니다."); return; }
       db = parsed;
+      // 추가된 안전장치
+      if (db.categories.length === 0) {
+        db.categories = [{ name:"기본", items:[] }, { name:"휴지통", items:[] }];
+      }
+      if (current >= db.categories.length) current = 0;
+      
       db.categories.forEach(cat => {
+        if(typeof cat.name !== "string"){
+          cat.name = "이름없음";
+        }
         if(!Array.isArray(cat.items)) cat.items = [];
         cat.items.forEach(item => {
           // ID 필드 보완 및 모든 식별자를 문자열로 통일 (기존 데이터 호환성 보장)
@@ -904,6 +934,8 @@ window.onload = () => {
   if(savedTheme) document.body.setAttribute("data-theme", savedTheme);
   render();
 };
+window.addEventListener("beforeunload", () => { save(); });
+
 </script>
 </body>
 </html>
