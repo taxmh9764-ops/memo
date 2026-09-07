@@ -313,6 +313,8 @@ textarea {
   <div class="btn-group">
     <button class="btn-side" onclick="addCategory()">＋ 카테고리 추가</button>
     <button class="btn-side" onclick="exportData()">💾 전체 데이터 백업</button>
+    <button class="btn-side" onclick="syncToCloud()">☁️ 클라우드에 올리기</button>
+    <button class="btn-side" onclick="syncFromCloud()">☁️ 클라우드에서 가져오기</button>
     <label class="btn-side">
       📁 데이터 불러오기
       <input type="file" style="display:none" onchange="importData(event)">
@@ -935,7 +937,60 @@ window.onload = () => {
   render();
 };
 window.addEventListener("beforeunload", () => { save(); });
+// 여기에 발급받은 키값을 직접 쏙! 넣어주세용
+const MY_API_KEY = "$2a$10$YbkR4OF57xYRNWsaB1Gemef2N68gpZ1pFYLr3miX8cAMrObE21tsO";
+const MY_BIN_ID = "6a9e60acac6210605aae6c28";
 
+async function syncToCloud() {
+  try {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${MY_BIN_ID}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': MY_API_KEY
+      },
+      body: JSON.stringify(db)
+    });
+    
+    if (res.ok) {
+      alert("클라우드에 안전하게 쏙! 저장했어요 히히 ☁️💖");
+    } else {
+      alert("앗... 저장에 실패했어요 ㅠㅠ 키 값을 다시 확인해주세용!");
+    }
+  } catch (e) {
+    alert("인터넷 연결이 끊어졌나 봐요 ㅠㅠ");
+  }
+}
+
+async function syncFromCloud() {
+  if (!confirm("클라우드 데이터를 불러오면 지금 작성 중인 내용이 덮어씌워져용! 괜찮으신가용?")) return;
+
+  try {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${MY_BIN_ID}`, {
+      method: 'GET',
+      headers: {
+        'X-Master-Key': MY_API_KEY
+      }
+    });
+    
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.record && data.record.categories) {
+        db = data.record;
+        current = 0; 
+        save();
+        render();
+        alert("클라우드에서 데이터를 완벽하게 가져왔어용 꺄아 🥰");
+      } else {
+         alert("데이터 모양이 조금 이상해용 ㅠㅠ");
+      }
+    } else {
+      alert("앗... 불러오기에 실패했어요 ㅠㅠ 설정값을 확인해주세용!");
+    }
+  } catch (e) {
+    alert("인터넷 연결이 끊어졌나 봐요 ㅠㅠ");
+  }
+}
 </script>
 </body>
 </html>
