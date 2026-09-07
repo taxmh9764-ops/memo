@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>업무 메모 Pro</title>
 
-<!-- PWA 설정: 매니페스트 및 테마 색상 -->
 <link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogInVwc2FuZyBNZW1vIFBybyIsCiAgInNob3J0X25hbWUiOiAi7JeF66y066mU66qoIiwKICAic3RhcnRfdXJsIjogIi4iLAogICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiNmOGY5ZmEiLAogICJ0aGVtZV9jb2xvciI6ICIjMDk4NGUzIiwKICAiaWNvbnMiOiBbCiAgICB7CiAgICAgICJzcmMiOiAiaHR0cHM6Ly9jZG4taWNvbnMtcG5nLmZsYXRpY29uLmNvbS81MTIvODg5Lzg4OTY0OC5wbmciLAogICAgICAic2l6ZXMiOiAiNTEyeDUxMiIsCiAgICAgICJ0eXBlIjogImltYWdlL3BuZyIsCiAgICAgICJwdXJwb3NlIjogImFueSBtYXNrYWJsZSIKICAgIH0KICBdCn0=">
 <meta name="theme-color" content="#0984e3">
 
@@ -506,7 +505,6 @@ async function quickAddBlock(){
 let saveTimers = {};
 
 function updateItem(ts, f, v){
-  // ts 비교 시 타입 문제(string vs number) 방지를 위해 느슨한 비교(==) 유지
   let item = db.categories[current].items.find(it => it.ts == ts);
   if (!item) return;
   item[f] = v;
@@ -818,8 +816,6 @@ function render(){
       filter: "textarea, input, .detail", 
       preventOnFilter: false, 
       onEnd: (evt) => {
-        // [오류 수정 부분] 드래그가 끝났을 때 데이터 꼬임을 방지하기 위해, 
-        // 화면에 그려진 카드의 고유 이름표(data-ts)를 추적하여 정렬하도록 수정했습니다.
         const newOrderTs = Array.from(list.querySelectorAll('.card')).map(card => card.getAttribute('data-ts'));
         let arr = db.categories[current].items;
         arr.sort((a, b) => newOrderTs.indexOf(String(a.ts)) - newOrderTs.indexOf(String(b.ts)));
@@ -900,7 +896,6 @@ function importData(e){
       const parsed = JSON.parse(reader.result);
       if(!parsed || !Array.isArray(parsed.categories)) { alert("잘못된 파일입니다."); return; }
       db = parsed;
-      // 추가된 안전장치
       if (db.categories.length === 0) {
         db.categories = [{ name:"기본", items:[] }, { name:"휴지통", items:[] }];
       }
@@ -912,7 +907,6 @@ function importData(e){
         }
         if(!Array.isArray(cat.items)) cat.items = [];
         cat.items.forEach(item => {
-          // ID 필드 보완 및 모든 식별자를 문자열로 통일 (기존 데이터 호환성 보장)
           if (!item.ts) {
             item.ts = String(item.id || generateUUID());
           } else {
@@ -937,60 +931,41 @@ window.onload = () => {
   render();
 };
 window.addEventListener("beforeunload", () => { save(); });
-// 여기에 발급받은 키값을 직접 쏙! 넣어주세용
-const MY_API_KEY = "$2a$10$YbkR4OF57xYRNWsaB1Gemef2N68gpZ1pFYLr3miX8cAMrObE21tsO";
-const MY_BIN_ID = "6a9e60acac6210605aae6c28";
+
+// 복사한 구글 웹 앱 URL을 아래 따옴표 안에 쏙 넣어주세요.
+const MY_DRIVE_URL = "https://script.google.com/macros/s/AKfycbycyRXliTYNiWdqkuuw7UAIVBHInBWXVs7uz4zG83SAk8-VgRqWpIjKtfDf1GnpREfirw/exec";
 
 async function syncToCloud() {
   try {
-    const res = await fetch(`https://api.jsonbin.io/v3/b/${MY_BIN_ID}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Master-Key': MY_API_KEY
-      },
+    // 구글 드라이브의 강력한 보안망을 통과하기 위해 통신 방식을 text/plain으로 우회합니다.
+    await fetch(MY_DRIVE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(db)
     });
-
-    if (res.ok) {
-      alert("클라우드에 안전하게 쏙! 저장했어요 히히 ☁️💖");
-    } else {
-      const errorData = await res.json();
-      const errorMessage = errorData.message || errorData.error || "원인 불명";
-      alert("앗 저장 실패 ㅠㅠ 서버 메시지: " + errorMessage);
-    }
+    alert("구글 드라이브에 든든하게 저장되었습니다냥! ☁️💖");
   } catch (e) {
-    alert("인터넷 연결이 끊어졌나 봐요 ㅠㅠ");
+    alert("저장 에러 원인: " + e.message);
   }
 }
 
 async function syncFromCloud() {
-  if (!confirm("클라우드 데이터를 불러오면 지금 작성 중인 내용이 덮어씌워져용! 괜찮으신가용?")) return;
-
+  if (!confirm("구글 드라이브 데이터를 불러오면 현재 내용이 덮어씌워집니다. 괜찮으신가요?")) return;
   try {
-    const res = await fetch(`https://api.jsonbin.io/v3/b/${MY_BIN_ID}`, {
-      method: 'GET',
-      headers: {
-        'X-Master-Key': MY_API_KEY
-      }
-    });
+    const res = await fetch(MY_DRIVE_URL, { method: 'GET' });
+    const data = await res.json();
     
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.record && data.record.categories) {
-        db = data.record;
-        current = 0; 
-        save();
-        render();
-        alert("클라우드에서 데이터를 완벽하게 가져왔어용 꺄아 🥰");
-      } else {
-         alert("데이터 모양이 조금 이상해용 ㅠㅠ");
-      }
+    if (data && data.categories) {
+      db = data;
+      current = 0; 
+      save();
+      render();
+      alert("구글 드라이브에서 데이터를 완벽하게 가져왔습니다냥! 🥰");
     } else {
-      alert("앗... 불러오기에 실패했어요 ㅠㅠ 설정값을 확인해주세용!");
+       alert("데이터 구조에 문제가 있습니다.");
     }
   } catch (e) {
-    alert("인터넷 연결이 끊어졌나 봐요 ㅠㅠ");
+    alert("불러오기 에러 원인: " + e.message);
   }
 }
 </script>
