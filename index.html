@@ -938,8 +938,8 @@ window.onload = () => {
 };
 window.addEventListener("beforeunload", () => { save(); });
 // 여기에 발급받은 키값을 직접 쏙! 넣어주세용
-const MY_API_KEY = $2a$10$YbkR4OF57xYRNWsaB1Gemef2N68gpZ1pFYLr3miX8cAMrObE21tsO;
-const MY_BIN_ID = 6a9e60acac6210605aae6c28;
+const MY_API_KEY = "$2a$10$YbkR4OF57xYRNWsaB1Gemef2N68gpZ1pFYLr3miX8cAMrObE21tsO";
+const MY_BIN_ID = "6a9e60acac6210605aae6c28";
 
 async function syncToCloud() {
   try {
@@ -951,11 +951,13 @@ async function syncToCloud() {
       },
       body: JSON.stringify(db)
     });
-    
+
     if (res.ok) {
       alert("클라우드에 안전하게 쏙! 저장했어요 히히 ☁️💖");
     } else {
-      alert("앗... 저장에 실패했어요 ㅠㅠ 키 값을 다시 확인해주세용!");
+      const errorData = await res.json();
+      const errorMessage = errorData.message || errorData.error || "원인 불명";
+      alert("앗 저장 실패 ㅠㅠ 서버 메시지: " + errorMessage);
     }
   } catch (e) {
     alert("인터넷 연결이 끊어졌나 봐요 ㅠㅠ");
